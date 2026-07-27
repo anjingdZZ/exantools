@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>考公错题整理助手</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📝</text></svg>">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: { 50: '#eef2ff', 100: '#e0e7ff', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca' },
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { -webkit-tap-highlight-color: transparent; }
+    body { padding-bottom: env(safe-area-inset-bottom); }
+    .upload-area {
+      border: 2px dashed #c7d2fe;
+      transition: all 0.2s;
+    }
+    .upload-area.dragover {
+      border-color: #6366f1;
+      background: #eef2ff;
+    }
+    .loading-spinner {
+      width: 28px; height: 28px;
+      border: 3px solid #e0e7ff;
+      border-top-color: #6366f1;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .fade-in { animation: fadeIn 0.3s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <div class="max-w-lg mx-auto px-4 py-6">
+    <!-- 标题 -->
+    <div class="text-center mb-6">
+      <h1 class="text-2xl font-bold text-gray-800">📝 考公错题整理</h1>
+      <p class="text-sm text-gray-500 mt-1">拍照 → AI识别 → 同步 Notion</p>
+    </div>
+
+    <!-- 上传区域 -->
+    <div id="uploadArea"
+         class="upload-area rounded-xl p-8 text-center cursor-pointer bg-white mb-4">
+      <div id="uploadPlaceholder">
+        <div class="text-5xl mb-3">📸</div>
+        <p class="text-gray-600 font-medium">点击拍照 或 选择图片</p>
+        <p class="text-xs text-gray-400 mt-2">支持 JPG / PNG，最大 20MB</p>
+      </div>
+      <div id="uploadPreview" class="hidden">
+        <img id="previewImage" class="max-h-64 mx-auto rounded-lg shadow-sm" alt="预览">
+        <p id="changePhoto" class="text-sm text-primary-600 mt-2 underline">重新选择</p>
+      </div>
+      <input id="fileInput" type="file" accept="image/*" capture="environment" class="hidden">
+    </div>
+
+    <!-- 识别中 -->
+    <div id="loadingState" class="hidden bg-white rounded-xl p-6 text-center mb-4">
+      <div class="loading-spinner mx-auto mb-3"></div>
+      <p class="text-gray-600">AI 识别中，请稍候...</p>
+      <p class="text-xs text-gray-400 mt-1">正在分析题目内容</p>
+    </div>
+
+    <!-- 结果区 -->
+    <div id="resultArea" class="hidden fade-in">
+      <!-- 错误提示 -->
+      <div id="errorMessage" class="hidden bg-red-50 border border-red-200 rounded-xl p-4 mb-4 text-red-700 text-sm"></div>
+
+      <div class="bg-white rounded-xl p-5 mb-4 shadow-sm">
+        <h2 class="text-base font-semibold text-gray-700 mb-4">📋 识别结果</h2>
+
+        <div class="space-y-3">
+          <!-- 模块 -->
+          <div>
+            <label class="text-xs text-gray-500 font-medium">模块</label>
+            <select id="fieldModule" class="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"></select>
+          </div>
+
+          <!-- 题型 -->
+          <div>
+            <label class="text-xs text-gray-500 font-medium">题型</label>
+            <select id="fieldType" class="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"></select>
+          </div>
+
+          <!-- 错误原因 -->
+          <div>
+            <label class="text-xs text-gray-500 font-medium">错误原因</label>
+            <select id="fieldErrorReason" class="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+              <option value="">请选择</option>
+              <option>知识点盲区</option>
+              <option>审题失误</option>
+              <option>掉坑</option>
+              <option>计算错误</option>
+              <option>时间不够</option>
+              <option>思路卡壳</option>
+            </select>
+          </div>
+
+          <!-- 知识点 -->
+          <div>
+            <label class="text-xs text-gray-500 font-medium">知识点（逗号分隔）</label>
+            <input id="fieldKnowledge" type="text" class="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder="如: 对称轴旋转, 面数量">
+          </div>
+
+          <!-- 来源 -->
+          <div>
+            <label class="text-xs text-gray-500 font-medium">来源</label>
+            <input id="fieldSource" type="text" class="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder="如: 2024国考 / 粉笔模考">
+          </div>
+
+          <!-- 答案 -->
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="text-xs text-gray-500 font-medium">我的答案</label>
+              <input id="fieldMyAnswer" type="text" class="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 font-medium">正确答案</label>
+              <input id="fieldCorrect" type="text" class="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+            </div>
+          </div>
+
+          <!-- 解题思路 -->
+          <div>
+            <label class="text-xs text-gray-500 font-medium">解题思路</label>
+            <textarea id="fieldSolution" rows="4" class="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- 同步按钮 -->
+      <button id="syncBtn"
+              class="w-full py-3.5 bg-primary-600 text-white font-medium rounded-xl text-base
+                     hover:bg-primary-700 active:bg-primary-800 transition-colors
+                     disabled:opacity-50 disabled:cursor-not-allowed shadow-sm">
+        📥 同步到 Notion
+      </button>
+      <p id="syncStatus" class="text-center text-sm mt-2 hidden"></p>
+    </div>
+
+    <!-- 操作提示 -->
+    <div id="hintArea" class="text-center mt-6 text-xs text-gray-400">
+      <p>识别结果可编辑修改，确认后同步到 Notion</p>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
