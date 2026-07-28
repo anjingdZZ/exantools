@@ -1,31 +1,40 @@
 const { Client } = require('@notionhq/client')
 
-const notion = new Client({ auth: process.env.NOTION_API_KEY })
+// 代理支持（本地开发需要走代理连 Notion API）
+let agent = undefined
+const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy
+if (proxyUrl) {
+  const { HttpsProxyAgent } = require('https-proxy-agent')
+  agent = new HttpsProxyAgent(proxyUrl)
+}
+
+const notion = new Client({
+  auth: process.env.NOTION_API_KEY,
+  agent,
+})
 const databaseId = process.env.NOTION_DATABASE_ID
+const summaryPageId = process.env.SUMMARY_PAGE_ID
 
 /**
- * 将结构化错题数据写入 Notion Database
- * @param {Object} data - 从 LLM 返回的结构化错题数据
- * @param {string} [imageUrl] - 可选的图片 URL
- * @returns {Object} Notion 创建的 Page 对象
+ * 同步错题：
+ * 1. 表格里新建一行（属性摘要，方便筛选）
+ * 2. 行详情页里放链接指向汇总页面
+ * 3. 全部详细内容追加到汇总页面
  */
-async function createWrongAnswerPage(data, imageUrl) {
-  // 构建属性
+async function syncWrongAnswer(data, imageUrl) {
+  const now = new Date().toISOString().split('T')[0]
+
+  // === 1. 创建表格行 ===
   const properties = {
-    '题目摘要': {
+    '模块': {
       title: [
         {
           text: {
-            content: data.question
-              ? data.question.slice(0, 80)
-              : '未识别题目',
+            content: data.module || '考公错题',
           },
         },
       ],
     },
-    '模块': data.module
-      ? { select: { name: data.module } }
-      : undefined,
     '题型': data.questionType
       ? { select: { name: data.questionType } }
       : undefined,
@@ -45,11 +54,14 @@ async function createWrongAnswerPage(data, imageUrl) {
       ? { select: { name: data.source } }
       : undefined,
     '错题次数': { number: 1 },
-    '上次错误日期': { date: { start: new Date().toISOString().split('T')[0] } },
+    '上次错误日期': { date: { start: now } },
     '掌握状态': { select: { name: '待复习' } },
+    '原图': imageUrl
+      ? { files: [{ name: '错题原图.jpg', type: 'external', external: { url: imageUrl } }] }
+      : undefined,
   }
 
-  // 过滤掉 undefined 属性
+  // 过滤 undefined
   const cleanProperties = {}
   for (const [key, value] of Object.entries(properties)) {
     if (value !== undefined) {
@@ -57,19 +69,98 @@ async function createWrongAnswerPage(data, imageUrl) {
     }
   }
 
-  // 构建内容 blocks
-  const children = []
+  // 行详情页的 blocks：展示原图 + 链接到汇总页面
+  const pageBlocks = []
 
   // 原图
   if (imageUrl) {
-    children.push({
+    pageBlocks.push({
       object: 'block',
-      type: 'heading2',
-      heading_2: {
-        rich_text: [{ type: 'text', text: { content: '📝 原题' } }],
+      type: 'image',
+      image: {
+        type: 'external',
+        external: { url: imageUrl },
       },
     })
-    children.push({
+  }
+
+  // 链接到汇总页面
+  if (summaryPageId) {
+    pageBlocks.push({
+      object: 'block',
+      type: 'paragraph',
+      paragraph: {
+        rich_text: [
+          { type: 'text', text: { content: '📚 ' } },
+          {
+            type: 'text',
+            text: { content: '查看全部错题汇总', link: { url: `https://notion.so/${summaryPageId.replace(/-/g, '')}` } },
+          },
+        ],
+      },
+    })
+  }
+
+  console.log('  📋 创建表格行...')
+  const dbPage = await retryOnFail(() =>
+    notion.pages.create({
+      parent: { database_id: databaseId },
+      properties: cleanProperties,
+      children: pageBlocks,
+    })
+  )
+
+  // === 2. 追加内容到汇总页面 ===
+  if (summaryPageId) {
+    const summaryBlocks = buildSummaryBlocks(data, imageUrl)
+    console.log('  📄 追加到汇总页面...')
+    await retryOnFail(() =>
+      notion.blocks.children.append({
+        block_id: summaryPageId,
+        children: summaryBlocks,
+      })
+    )
+  }
+
+  return {
+    url: summaryPageId
+      ? `https://notion.so/${summaryPageId.replace(/-/g, '')}`
+      : dbPage.url,
+    id: summaryPageId || dbPage.id,
+  }
+}
+
+/**
+ * 构建汇总页面中的错题内容 blocks
+ */
+function buildSummaryBlocks(data, imageUrl) {
+  const blocks = []
+
+  // 分隔线
+  blocks.push({ object: 'block', type: 'divider', divider: {} })
+
+  // 标签行：模块 · 题型 · 错误原因 · 知识点
+  const tags = [
+    data.module,
+    data.questionType,
+    data.errorReason,
+    data.knowledgePoints?.length ? data.knowledgePoints.join('、') : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+  if (tags) {
+    blocks.push({
+      object: 'block',
+      type: 'paragraph',
+      paragraph: {
+        rich_text: [{ type: 'text', text: { content: `🏷 ${tags}` } }],
+      },
+    })
+  }
+
+  // 原题图片
+  if (imageUrl) {
+    blocks.push({
       object: 'block',
       type: 'image',
       image: {
@@ -81,7 +172,7 @@ async function createWrongAnswerPage(data, imageUrl) {
 
   // 题目文本
   if (data.question) {
-    children.push({
+    blocks.push({
       object: 'block',
       type: 'paragraph',
       paragraph: {
@@ -92,19 +183,12 @@ async function createWrongAnswerPage(data, imageUrl) {
 
   // 选项
   if (data.options) {
-    children.push({
-      object: 'block',
-      type: 'heading2',
-      heading_2: {
-        rich_text: [{ type: 'text', text: { content: '📋 选项' } }],
-      },
-    })
     const optionText = Object.entries(data.options)
       .filter(([_, v]) => v)
       .map(([k, v]) => `${k}. ${v}`)
       .join('\n')
     if (optionText) {
-      children.push({
+      blocks.push({
         object: 'block',
         type: 'paragraph',
         paragraph: {
@@ -122,7 +206,7 @@ async function createWrongAnswerPage(data, imageUrl) {
     ]
       .filter(Boolean)
       .join('    ')
-    children.push({
+    blocks.push({
       object: 'block',
       type: 'paragraph',
       paragraph: {
@@ -133,46 +217,40 @@ async function createWrongAnswerPage(data, imageUrl) {
 
   // 解析
   if (data.solution) {
-    children.push({
-      object: 'block',
-      type: 'heading2',
-      heading_2: {
-        rich_text: [{ type: 'text', text: { content: '🔍 解析' } }],
-      },
-    })
-    children.push({
+    blocks.push({
       object: 'block',
       type: 'paragraph',
       paragraph: {
-        rich_text: [{ type: 'text', text: { content: data.solution } }],
+        rich_text: [{ type: 'text', text: { content: `🔍 ${data.solution}` } }],
       },
     })
   }
 
-  // 预留笔记区域
-  children.push({
-    object: 'block',
-    type: 'heading2',
-    heading_2: {
-      rich_text: [{ type: 'text', text: { content: '💡 我的笔记' } }],
-    },
-  })
-  children.push({
-    object: 'block',
-    type: 'paragraph',
-    paragraph: {
-      rich_text: [{ type: 'text', text: { content: '' } }],
-    },
-  })
-
-  // 创建 Notion Page
-  const response = await notion.pages.create({
-    parent: { database_id: databaseId },
-    properties: cleanProperties,
-    children,
-  })
-
-  return response
+  return blocks
 }
 
-module.exports = { createWrongAnswerPage }
+/**
+ * 网络请求自动重试
+ */
+async function retryOnFail(fn, retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn()
+    } catch (err) {
+      const isRetryable =
+        err.code === 'ECONNRESET' ||
+        err.code === 'ETIMEDOUT' ||
+        err.code === 'ECONNREFUSED' ||
+        err.status === 429 ||
+        err.status >= 500
+      if (isRetryable && i < retries - 1) {
+        console.log(`  ⚠️ Notion API 请求失败 (${err.code || err.status}), 第 ${i + 2}/${retries} 次重试...`)
+        await new Promise((r) => setTimeout(r, 2000))
+      } else {
+        throw err
+      }
+    }
+  }
+}
+
+module.exports = { syncWrongAnswer }

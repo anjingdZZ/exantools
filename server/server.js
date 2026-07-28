@@ -11,8 +11,9 @@ const PORT = process.env.PORT || 3100
 app.use(express.json({ limit: '50mb' }))
 app.use(express.urlencoded({ extended: true, limit: '50mb' }))
 
-// 静态文件托管（前端页面）
+// 静态文件托管（前端页面 + 上传图片）
 app.use(express.static(path.join(__dirname, 'public')))
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 
 // API 路由
 app.use('/api', processRouter)

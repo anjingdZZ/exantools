@@ -1,11 +1,19 @@
 const express = require('express')
 const multer = require('multer')
+const path = require('path')
+const fs = require('fs')
 const { extractFromImage } = require('../services/llm')
-const { createWrongAnswerPage } = require('../services/notion')
+const { syncWrongAnswer } = require('../services/notion')
 
 const router = express.Router()
 
-// 图片上传（兼容：multipart 和 base64 JSON 两种方式）
+// 确保 uploads 目录存在
+const uploadsDir = path.join(__dirname, '..', 'uploads')
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true })
+}
+
+// 图片上传（内存存储，用于 process 接口）
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024 },
@@ -20,25 +28,19 @@ const upload = multer({
 
 /**
  * POST /api/process
- * 上传图片 → DeepSeek Vision 识别 → 返回结构化 JSON
- * 支持两种传图方式：
- *   1. multipart/form-data: field name = "image"
- *   2. application/json: { image: "data:image/...;base64,..." }
+ * 上传图片 → OCR → DeepSeek 结构化 → 返回 JSON
  */
 router.post('/process', upload.single('image'), async (req, res) => {
   try {
     let imageBuffer, mimeType
 
-    // 方式1: multipart 上传
     if (req.file) {
       imageBuffer = req.file.buffer
       mimeType = req.file.mimetype
-    }
-    // 方式2: base64 JSON
-    else if (req.body && req.body.image) {
+    } else if (req.body && req.body.image) {
       const matches = req.body.image.match(/^data:image\/(\w+);base64,(.+)$/)
       if (!matches) {
-        return res.status(400).json({ error: '图片格式无效，请使用 data:image/...;base64,... 格式' })
+        return res.status(400).json({ error: '图片格式无效' })
       }
       mimeType = `image/${matches[1]}`
       imageBuffer = Buffer.from(matches[2], 'base64')
@@ -57,7 +59,7 @@ router.post('/process', upload.single('image'), async (req, res) => {
 
 /**
  * POST /api/sync
- * 接收结构化数据 → 写入 Notion
+ * 接收结构化数据 + base64 图片 → 保存图片 → 写入 Notion
  */
 router.post('/sync', async (req, res) => {
   try {
@@ -67,12 +69,33 @@ router.post('/sync', async (req, res) => {
       return res.status(400).json({ error: '缺少必要字段（module）' })
     }
 
-    const page = await createWrongAnswerPage(data, req.body.imageUrl)
+    // 保存图片到本地，获取可访问的 URL
+    let imageUrl = null
+    if (data.imageUrl && data.imageUrl.startsWith('data:image/')) {
+      const matches = data.imageUrl.match(/^data:image\/(\w+);base64,(.+)$/)
+      if (matches) {
+        const ext = matches[1] === 'png' ? 'png' : 'jpg'
+        const fileName = `wt_${Date.now()}.${ext}`
+        const filePath = path.join(uploadsDir, fileName)
+        const buffer = Buffer.from(matches[2], 'base64')
+        fs.writeFileSync(filePath, buffer)
+        imageUrl = `/uploads/${fileName}`
+        console.log('  📷 图片已保存:', imageUrl)
+      }
+    }
+
+    // 构造完整 URL（如果是相对路径，补全为绝对地址）
+    if (imageUrl && imageUrl.startsWith('/')) {
+      const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`
+      imageUrl = `${baseUrl}${imageUrl}`
+    }
+
+    const result = await syncWrongAnswer(data, imageUrl)
 
     res.json({
       success: true,
-      notionUrl: page.url,
-      pageId: page.id,
+      notionUrl: result.url,
+      pageId: result.id,
     })
   } catch (error) {
     console.error('同步失败:', error.message)
