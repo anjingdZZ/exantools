@@ -27,13 +27,21 @@ const syncBtn = document.getElementById('syncBtn')
 const syncStatus = document.getElementById('syncStatus')
 const hintText = document.getElementById('hintText')
 
+// 手动模式的图片上传
+const manualUploadSection = document.getElementById('manualUploadSection')
+const manualUploadArea = document.getElementById('manualUploadArea')
+const manualUploadPlaceholder = document.getElementById('manualUploadPlaceholder')
+const manualUploadPreview = document.getElementById('manualUploadPreview')
+const manualPreviewImage = document.getElementById('manualPreviewImage')
+const manualChangePhoto = document.getElementById('manualChangePhoto')
+const manualFileInput = document.getElementById('manualFileInput')
+
 const F = {
   module: document.getElementById('fieldModule'),
   type: document.getElementById('fieldType'),
   error: document.getElementById('fieldErrorReason'),
   knowledge: document.getElementById('fieldKnowledge'),
   source: document.getElementById('fieldSource'),
-  question: document.getElementById('fieldQuestion'),
   myAnswer: document.getElementById('fieldMyAnswer'),
   correct: document.getElementById('fieldCorrect'),
   solution: document.getElementById('fieldSolution'),
@@ -68,39 +76,45 @@ function setMode(manual) {
   clearForm()
   errorMessage.classList.add('hidden')
   syncStatus.classList.add('hidden')
+  // 重置图片
+  currentImageBase64 = null
+  uploadPlaceholder.classList.remove('hidden')
+  uploadPreview.classList.add('hidden')
+  manualUploadPlaceholder.classList.remove('hidden')
+  manualUploadPreview.classList.add('hidden')
 
   if (manual) {
-    // 手动：隐藏上传区，直接显示表单，显示选项框
     uploadArea.classList.add('hidden')
     loadingState.classList.add('hidden')
     resultArea.classList.remove('hidden')
     formTitle.textContent = '✏️ 手动填写'
-    hintText.textContent = '填写完整信息后同步到 Notion'
+    hintText.textContent = '填写信息后同步到 Notion'
+    manualUploadSection.classList.remove('hidden')
   } else {
-    // AI：显示上传区，隐藏表单
     uploadArea.classList.remove('hidden')
     resultArea.classList.add('hidden')
     formTitle.textContent = '📋 编辑内容'
     hintText.textContent = '拍照上传 → AI 自动识别 → 确认修改 → 同步到 Notion'
+    manualUploadSection.classList.add('hidden')
   }
 }
 
 aiModeBtn.addEventListener('click', () => setMode(false))
 manualModeBtn.addEventListener('click', () => setMode(true))
 
-// ===== 上传 =====
+// ===== AI 模式上传 =====
 uploadArea.addEventListener('click', () => fileInput.click())
 uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover') })
 uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'))
 uploadArea.addEventListener('drop', (e) => {
   e.preventDefault()
   uploadArea.classList.remove('dragover')
-  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0])
+  if (e.dataTransfer.files[0]) handleAIFile(e.dataTransfer.files[0])
 })
 changePhoto.addEventListener('click', (e) => { e.stopPropagation(); fileInput.click() })
-fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]) })
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleAIFile(fileInput.files[0]) })
 
-function handleFile(file) {
+function handleAIFile(file) {
   if (!file.type.startsWith('image/')) { showToast('请选择图片文件'); return }
   if (file.size > 20 * 1024 * 1024) { showToast('图片超过 20MB 限制'); return }
   const reader = new FileReader()
@@ -116,6 +130,27 @@ function handleFile(file) {
   reader.readAsDataURL(file)
 }
 
+// ===== 手动模式图片上传 =====
+manualUploadArea.addEventListener('click', () => manualFileInput.click())
+manualChangePhoto.addEventListener('click', (e) => { e.stopPropagation(); manualFileInput.click() })
+manualFileInput.addEventListener('change', () => {
+  if (manualFileInput.files[0]) handleManualFile(manualFileInput.files[0])
+})
+
+function handleManualFile(file) {
+  if (!file.type.startsWith('image/')) { showToast('请选择图片文件'); return }
+  if (file.size > 20 * 1024 * 1024) { showToast('图片超过 20MB 限制'); return }
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    currentImageBase64 = e.target.result
+    manualPreviewImage.src = currentImageBase64
+    manualUploadPlaceholder.classList.add('hidden')
+    manualUploadPreview.classList.remove('hidden')
+  }
+  reader.readAsDataURL(file)
+}
+
+// ===== AI 识别 =====
 async function submitImage(base64) {
   loadingState.classList.remove('hidden')
   try {
@@ -147,7 +182,6 @@ function fillResult(data) {
   if (data.errorReason) F.error.value = data.errorReason
   if (data.knowledgePoints?.length) F.knowledge.value = data.knowledgePoints.join(', ')
   if (data.source) F.source.value = data.source
-  if (data.question) F.question.value = data.question
   if (data.myAnswer) F.myAnswer.value = data.myAnswer
   if (data.correctAnswer) F.correct.value = data.correctAnswer
   if (data.solution) F.solution.value = data.solution
@@ -173,7 +207,6 @@ syncBtn.addEventListener('click', async () => {
     errorReason: F.error.value,
     knowledgePoints: F.knowledge.value ? F.knowledge.value.split(/[,，]/).map(s => s.trim()).filter(Boolean) : [],
     source: F.source.value,
-    question: F.question.value,
     myAnswer: F.myAnswer.value,
     correctAnswer: F.correct.value,
     solution: F.solution.value,
