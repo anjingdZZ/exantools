@@ -253,4 +253,70 @@ async function retryOnFail(fn, retries = 3) {
   }
 }
 
-module.exports = { syncWrongAnswer }
+/**
+ * 从 Notion 拉取所有错题记录
+ */
+async function fetchWrongAnswers() {
+  const results = []
+  let cursor = null
+  let hasMore = true
+
+  while (hasMore) {
+    const queryParams = {
+      database_id: databaseId,
+      page_size: 100,
+      sorts: [{ timestamp: 'last_edited_time', direction: 'descending' }],
+    }
+    if (cursor) queryParams.start_cursor = cursor
+    const response = await notion.databases.query(queryParams)
+
+    for (const page of response.results) {
+      const p = page.properties
+      const item = {
+        id: page.id,
+        module: p['模块']?.title?.[0]?.plain_text || '',
+        questionType: p['题型']?.select?.name || '',
+        errorReason: p['错误原因']?.select?.name || '',
+        knowledgePoints: p['知识点']?.multi_select?.map((x) => x.name) || [],
+        source: p['来源']?.select?.name || '',
+        myAnswer: p['我的答案']?.rich_text?.[0]?.plain_text || '',
+        correctAnswer: p['正确答案']?.rich_text?.[0]?.plain_text || '',
+        solution: '',
+        imageUrl: null,
+        mistakeCount: p['错题次数']?.number || 1,
+        status: p['掌握状态']?.select?.name || '待复习',
+        date: p['上次错误日期']?.date?.start || '',
+      }
+
+      // 取原图 URL
+      const fileProp = p['原图']
+      if (fileProp?.files?.length) {
+        const f = fileProp.files[0]
+        item.imageUrl = f.type === 'external' ? f.external?.url : f.file?.url
+      }
+
+      // 取详情页的 blocks（解题思路放在第一个文本段落里）
+      try {
+        const blocks = await notion.blocks.children.list({ block_id: page.id, page_size: 20 })
+        for (const block of blocks.results) {
+          if (block.type === 'paragraph') {
+            const text = block.paragraph?.rich_text?.map((t) => t.plain_text).join('') || ''
+            if (text.includes('🔍')) {
+              item.solution = text.replace('🔍', '').replace('解析:', '').trim()
+              break
+            }
+          }
+        }
+      } catch (_) {}
+
+      results.push(item)
+    }
+
+    hasMore = response.has_more
+    cursor = response.next_cursor
+  }
+
+  return results
+}
+
+module.exports = { syncWrongAnswer, fetchWrongAnswers }

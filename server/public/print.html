@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>错题本 - 打印</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background: #f5f5f5;
+      padding: 20px;
+    }
+
+    /* 顶部 */
+    .header {
+      max-width: 800px;
+      margin: 0 auto 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .header h1 { font-size: 22px; color: #333; }
+    .header-actions { display: flex; gap: 10px; }
+    .btn {
+      padding: 10px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .btn-primary { background: #6366f1; color: white; }
+    .btn-primary:hover { background: #4f46e5; }
+    .btn-outline { background: white; color: #6366f1; border: 1.5px solid #6366f1; }
+    .btn-outline:hover { background: #eef2ff; }
+
+    /* 统计 */
+    .stats {
+      max-width: 800px;
+      margin: 0 auto 20px;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .stat-card {
+      background: white;
+      border-radius: 10px;
+      padding: 12px 18px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      font-size: 13px;
+    }
+    .stat-card .num { font-size: 20px; font-weight: 700; color: #6366f1; }
+    .stat-card .label { color: #888; margin-top: 2px; }
+
+    /* 筛选 */
+    .filters {
+      max-width: 800px;
+      margin: 0 auto 20px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .filters select {
+      padding: 6px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 13px;
+      background: white;
+    }
+
+    /* 错题卡片 */
+    .card {
+      max-width: 800px;
+      margin: 0 auto 16px;
+      background: white;
+      border-radius: 10px;
+      padding: 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .card-tags {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .tag {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .tag-module { background: #eef2ff; color: #4f46e5; }
+    .tag-type { background: #f0fdf4; color: #16a34a; }
+    .tag-error { background: #fef2f2; color: #dc2626; }
+    .tag-kp { background: #fff7ed; color: #ea580c; }
+    .tag-source { background: #f5f5f5; color: #666; }
+    .card-body { display: flex; gap: 20px; }
+    .card-image {
+      flex-shrink: 0;
+      width: 200px;
+    }
+    .card-image img {
+      width: 100%;
+      border-radius: 6px;
+      border: 1px solid #eee;
+    }
+    .card-info { flex: 1; min-width: 0; }
+    .card-info .row {
+      display: flex;
+      align-items: baseline;
+      margin-bottom: 6px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .card-info .label { color: #888; width: 70px; flex-shrink: 0; }
+    .card-info .value { color: #333; }
+    .card-info .value.wrong { color: #dc2626; font-weight: 600; }
+    .card-info .value.correct { color: #16a34a; font-weight: 600; }
+    .card-info .solution {
+      margin-top: 8px;
+      padding: 10px;
+      background: #f9fafb;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #555;
+      line-height: 1.7;
+      white-space: pre-wrap;
+    }
+    .card-number {
+      position: absolute;
+      top: 12px;
+      right: 16px;
+      font-size: 12px;
+      color: #bbb;
+    }
+    .card { position: relative; }
+
+    /* 空状态 */
+    .empty {
+      text-align: center;
+      padding: 60px 20px;
+      color: #999;
+    }
+    .empty .icon { font-size: 48px; margin-bottom: 12px; }
+
+    /* loading */
+    .loading {
+      text-align: center;
+      padding: 60px;
+      color: #999;
+    }
+    .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid #e0e7ff;
+      border-top-color: #6366f1;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin: 0 auto 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ===== 打印样式 ===== */
+    @media print {
+      body { background: white; padding: 0; }
+      .header-actions, .filters, .stats { display: none !important; }
+      .card { box-shadow: none; border: 1px solid #ddd; break-inside: avoid; }
+      .header { margin-bottom: 10px; }
+      .header h1 { font-size: 18px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 顶部 -->
+  <div class="header">
+    <h1>📚 错题本</h1>
+    <div class="header-actions" id="headerActions">
+      <button class="btn btn-outline" onclick="window.location.href='/'">← 返回</button>
+      <button class="btn btn-primary" onclick="window.print()">🖨️ 打印 / 导出 PDF</button>
+    </div>
+  </div>
+
+  <!-- 统计 -->
+  <div class="stats" id="stats"></div>
+
+  <!-- 筛选 -->
+  <div class="filters" id="filters">
+    <select id="filterModule" onchange="render()">
+      <option value="">全部模块</option>
+    </select>
+    <select id="filterError" onchange="render()">
+      <option value="">全部错误原因</option>
+    </select>
+    <select id="filterStatus" onchange="render()">
+      <option value="">全部状态</option>
+      <option value="待复习">待复习</option>
+      <option value="基本掌握">基本掌握</option>
+      <option value="已掌握">已掌握</option>
+    </select>
+  </div>
+
+  <!-- 内容 -->
+  <div id="content">
+    <div class="loading">
+      <div class="spinner"></div>
+      <p>正在加载错题数据...</p>
+    </div>
+  </div>
+
+  <script>
+    let allItems = []
+    let filteredItems = []
+
+    // 加载数据
+    fetch('/api/wrong-answers')
+      .then(r => r.json())
+      .then(json => {
+        if (!json.success) throw new Error(json.error)
+        allItems = json.data
+        initFilters()
+        render()
+      })
+      .catch(err => {
+        document.getElementById('content').innerHTML =
+          '<div class="empty"><div class="icon">❌</div><p>加载失败: ' + err.message + '</p></div>'
+      })
+
+    // 初始化筛选器
+    function initFilters() {
+      const modules = new Set(allItems.map(x => x.module).filter(Boolean))
+      const errors = new Set(allItems.map(x => x.errorReason).filter(Boolean))
+      const selModule = document.getElementById('filterModule')
+      modules.forEach(m => {
+        const opt = document.createElement('option')
+        opt.value = m; opt.textContent = m
+        selModule.appendChild(opt)
+      })
+      const selError = document.getElementById('filterError')
+      errors.forEach(e => {
+        const opt = document.createElement('option')
+        opt.value = e; opt.textContent = e
+        selError.appendChild(opt)
+      })
+    }
+
+    // 渲染
+    function render() {
+      const fm = document.getElementById('filterModule').value
+      const fe = document.getElementById('filterError').value
+      const fs = document.getElementById('filterStatus').value
+
+      filteredItems = allItems.filter(x => {
+        if (fm && x.module !== fm) return false
+        if (fe && x.errorReason !== fe) return false
+        if (fs && x.status !== fs) return false
+        return true
+      })
+
+      // 更新统计
+      const stats = document.getElementById('stats')
+      const modules = new Set(filteredItems.map(x => x.module).filter(Boolean))
+      const errors = new Set(filteredItems.map(x => x.errorReason).filter(Boolean))
+      stats.innerHTML = `
+        <div class="stat-card"><div class="num">${filteredItems.length}</div><div class="label">总错题</div></div>
+        <div class="stat-card"><div class="num">${modules.size}</div><div class="label">涉及模块</div></div>
+        <div class="stat-card"><div class="num">${errors.size}</div><div class="label">错误类型</div></div>
+        <div class="stat-card"><div class="num">${filteredItems.filter(x => x.status === '待复习').length}</div><div class="label">待复习</div></div>
+        <div class="stat-card"><div class="num">${filteredItems.filter(x => x.status === '已掌握').length}</div><div class="label">已掌握</div></div>
+      `
+
+      // 渲染卡片
+      const container = document.getElementById('content')
+      if (!filteredItems.length) {
+        container.innerHTML = '<div class="empty"><div class="icon">📭</div><p>暂无错题记录</p></div>'
+        return
+      }
+      container.innerHTML = filteredItems.map((item, i) => {
+        const tags = []
+        if (item.module) tags.push('<span class="tag tag-module">' + item.module + '</span>')
+        if (item.questionType) tags.push('<span class="tag tag-type">' + item.questionType + '</span>')
+        if (item.errorReason) tags.push('<span class="tag tag-error">' + item.errorReason + '</span>')
+        item.knowledgePoints.forEach(kp => {
+          tags.push('<span class="tag tag-kp">' + kp + '</span>')
+        })
+        if (item.source) tags.push('<span class="tag tag-source">' + item.source + '</span>')
+        if (item.status) tags.push('<span class="tag" style="background:#f0fdf4;color:#16a34a">' + item.status + '</span>')
+
+        const imageHtml = item.imageUrl
+          ? '<div class="card-image"><img src="' + item.imageUrl + '" alt="原题"></div>'
+          : ''
+
+        let solution = item.solution || ''
+        if (!solution) {
+          // 尝试从备注字段取一些描述
+        }
+
+        return '<div class="card">' +
+          '<div class="card-tags">' + tags.join('') + '</div>' +
+          '<div class="card-body">' +
+            imageHtml +
+            '<div class="card-info">' +
+              (item.source ? '<div class="row"><span class="label">来源</span><span class="value">' + item.source + '</span></div>' : '') +
+              (item.myAnswer ? '<div class="row"><span class="label">我的答案</span><span class="value wrong">' + item.myAnswer + '</span></div>' : '') +
+              (item.correctAnswer ? '<div class="row"><span class="label">正确答案</span><span class="value correct">' + item.correctAnswer + '</span></div>' : '') +
+              (item.mistakeCount > 1 ? '<div class="row"><span class="label">错题次数</span><span class="value">' + item.mistakeCount + '</span></div>' : '') +
+              (item.date ? '<div class="row"><span class="label">日期</span><span class="value">' + item.date + '</span></div>' : '') +
+              (solution ? '<div class="solution">🔍 ' + solution + '</div>' : '') +
+            '</div>' +
+          '</div>' +
+          '<span class="card-number">#' + (i + 1) + '</span>' +
+        '</div>'
+      }).join('')
+    }
+  </script>
+</body>
+</html>

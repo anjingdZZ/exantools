@@ -3,7 +3,7 @@ const multer = require('multer')
 const path = require('path')
 const fs = require('fs')
 const { extractFromImage } = require('../services/llm')
-const { syncWrongAnswer } = require('../services/notion')
+const { syncWrongAnswer, fetchWrongAnswers } = require('../services/notion')
 
 const router = express.Router()
 
@@ -100,6 +100,20 @@ router.post('/sync', async (req, res) => {
   } catch (error) {
     console.error('同步失败:', error.message)
     res.status(500).json({ error: `同步到 Notion 失败: ${error.message}` })
+  }
+})
+
+/**
+ * GET /api/wrong-answers
+ * 从 Notion 拉取所有错题（用于打印）
+ */
+router.get('/wrong-answers', async (_req, res) => {
+  try {
+    const data = await fetchWrongAnswers()
+    res.json({ success: true, data })
+  } catch (error) {
+    console.error('拉取错题失败:', error.message)
+    res.status(500).json({ error: `拉取失败: ${error.message}` })
   }
 })
 
