@@ -3,9 +3,11 @@ const { Client } = require('@notionhq/client')
 // 代理支持（本地开发需要走代理连 Notion API）
 let agent = undefined
 const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy
-if (proxyUrl) {
-  const { HttpsProxyAgent } = require('https-proxy-agent')
-  agent = new HttpsProxyAgent(proxyUrl)
+if (proxyUrl && proxyUrl.startsWith('http')) {
+  try {
+    const { HttpsProxyAgent } = require('https-proxy-agent')
+    agent = new HttpsProxyAgent(proxyUrl)
+  } catch (_) {}
 }
 
 const notion = new Client({

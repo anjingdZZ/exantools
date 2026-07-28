@@ -69,6 +69,52 @@
       background: white;
     }
 
+    /* 显示切换按钮 */
+    .toggle-group {
+      max-width: 800px;
+      margin: 0 auto 16px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .toggle-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      border: 1.5px solid #ddd;
+      background: white;
+      color: #555;
+      transition: 0.2s;
+      user-select: none;
+    }
+    .toggle-btn.on {
+      border-color: #6366f1;
+      background: #eef2ff;
+      color: #4f46e5;
+    }
+    .toggle-btn .indicator {
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+      border: 2px solid #ccc;
+      background: white;
+      transition: 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+    }
+    .toggle-btn.on .indicator {
+      border-color: #6366f1;
+      background: #6366f1;
+      color: white;
+    }
+    .row.hidden-answer { display: none; }
+
     /* 错题卡片 */
     .card {
       max-width: 800px;
@@ -166,7 +212,7 @@
     /* ===== 打印样式 ===== */
     @media print {
       body { background: white; padding: 0; }
-      .header-actions, .filters, .stats { display: none !important; }
+      .header-actions, .filters, .stats, .toggle-group { display: none !important; }
       .card { box-shadow: none; border: 1px solid #ddd; break-inside: avoid; }
       .header { margin-bottom: 10px; }
       .header h1 { font-size: 18px; }
@@ -203,6 +249,18 @@
     </select>
   </div>
 
+  <!-- 显示切换 -->
+  <div class="toggle-group" id="toggleGroup">
+    <div class="toggle-btn on" id="toggleMyAnswer" onclick="toggleAnswer('myAnswer')">
+      <span class="indicator">✓</span>
+      <span>显示我的答案</span>
+    </div>
+    <div class="toggle-btn on" id="toggleCorrectAnswer" onclick="toggleAnswer('correctAnswer')">
+      <span class="indicator">✓</span>
+      <span>显示正确答案</span>
+    </div>
+  </div>
+
   <!-- 内容 -->
   <div id="content">
     <div class="loading">
@@ -214,6 +272,8 @@
   <script>
     let allItems = []
     let filteredItems = []
+    let showMyAnswer = true
+    let showCorrectAnswer = true
 
     // 加载数据
     fetch('/api/wrong-answers')
@@ -245,6 +305,20 @@
         opt.value = e; opt.textContent = e
         selError.appendChild(opt)
       })
+    }
+
+    // 切换答案显示
+    function toggleAnswer(type) {
+      if (type === 'myAnswer') {
+        showMyAnswer = !showMyAnswer
+        document.getElementById('toggleMyAnswer').className = 'toggle-btn ' + (showMyAnswer ? 'on' : '')
+        document.getElementById('toggleMyAnswer').querySelector('span:last-child').textContent = showMyAnswer ? '显示我的答案' : '隐藏我的答案'
+      } else {
+        showCorrectAnswer = !showCorrectAnswer
+        document.getElementById('toggleCorrectAnswer').className = 'toggle-btn ' + (showCorrectAnswer ? 'on' : '')
+        document.getElementById('toggleCorrectAnswer').querySelector('span:last-child').textContent = showCorrectAnswer ? '显示正确答案' : '隐藏正确答案'
+      }
+      render()
     }
 
     // 渲染
@@ -304,8 +378,8 @@
             imageHtml +
             '<div class="card-info">' +
               (item.source ? '<div class="row"><span class="label">来源</span><span class="value">' + item.source + '</span></div>' : '') +
-              (item.myAnswer ? '<div class="row"><span class="label">我的答案</span><span class="value wrong">' + item.myAnswer + '</span></div>' : '') +
-              (item.correctAnswer ? '<div class="row"><span class="label">正确答案</span><span class="value correct">' + item.correctAnswer + '</span></div>' : '') +
+              (item.myAnswer ? '<div class="row' + (!showMyAnswer ? ' hidden-answer' : '') + '"><span class="label">我的答案</span><span class="value wrong">' + item.myAnswer + '</span></div>' : '') +
+              (item.correctAnswer ? '<div class="row' + (!showCorrectAnswer ? ' hidden-answer' : '') + '"><span class="label">正确答案</span><span class="value correct">' + item.correctAnswer + '</span></div>' : '') +
               (item.mistakeCount > 1 ? '<div class="row"><span class="label">错题次数</span><span class="value">' + item.mistakeCount + '</span></div>' : '') +
               (item.date ? '<div class="row"><span class="label">日期</span><span class="value">' + item.date + '</span></div>' : '') +
               (solution ? '<div class="solution">🔍 ' + solution + '</div>' : '') +

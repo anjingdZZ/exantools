@@ -5,9 +5,11 @@ const { SYSTEM_PROMPT } = require('../prompts/extract')
 // 代理支持
 let agent = undefined
 const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy
-if (proxyUrl) {
-  const { HttpsProxyAgent } = require('https-proxy-agent')
-  agent = new HttpsProxyAgent(proxyUrl)
+if (proxyUrl && proxyUrl.startsWith('http')) {
+  try {
+    const { HttpsProxyAgent } = require('https-proxy-agent')
+    agent = new HttpsProxyAgent(proxyUrl)
+  } catch (_) {}
 }
 
 const deepseek = new OpenAI({
