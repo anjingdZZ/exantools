@@ -11,6 +11,9 @@ const ENUMS = {
 }
 
 // ===== DOM 引用 =====
+const modeToggle = document.getElementById('modeToggle')
+const toggleLabel = document.getElementById('toggleLabel')
+const aiSection = document.getElementById('aiSection')
 const fileInput = document.getElementById('fileInput')
 const uploadArea = document.getElementById('uploadArea')
 const uploadPlaceholder = document.getElementById('uploadPlaceholder')
@@ -19,21 +22,28 @@ const previewImage = document.getElementById('previewImage')
 const changePhoto = document.getElementById('changePhoto')
 const loadingState = document.getElementById('loadingState')
 const resultArea = document.getElementById('resultArea')
+const formTitle = document.getElementById('formTitle')
 const errorMessage = document.getElementById('errorMessage')
 const syncBtn = document.getElementById('syncBtn')
 const syncStatus = document.getElementById('syncStatus')
-const hintArea = document.getElementById('hintArea')
+const hintText = document.getElementById('hintText')
 
 const fieldModule = document.getElementById('fieldModule')
 const fieldType = document.getElementById('fieldType')
 const fieldErrorReason = document.getElementById('fieldErrorReason')
 const fieldKnowledge = document.getElementById('fieldKnowledge')
 const fieldSource = document.getElementById('fieldSource')
+const fieldQuestion = document.getElementById('fieldQuestion')
+const fieldOptA = document.getElementById('fieldOptA')
+const fieldOptB = document.getElementById('fieldOptB')
+const fieldOptC = document.getElementById('fieldOptC')
+const fieldOptD = document.getElementById('fieldOptD')
 const fieldMyAnswer = document.getElementById('fieldMyAnswer')
 const fieldCorrect = document.getElementById('fieldCorrect')
 const fieldSolution = document.getElementById('fieldSolution')
 
 let currentImageBase64 = null
+let isManualMode = false
 
 // ===== 初始化下拉框 =====
 ENUMS.module.forEach((m) => {
@@ -54,6 +64,54 @@ fieldModule.addEventListener('change', () => {
     fieldType.appendChild(opt)
   })
 })
+
+// ===== 模式切换 =====
+modeToggle.addEventListener('click', () => {
+  isManualMode = !isManualMode
+  modeToggle.classList.toggle('active', isManualMode)
+  toggleLabel.textContent = isManualMode ? '✏️ 手动' : '🤖 AI'
+
+  if (isManualMode) {
+    // 手动模式：隐藏上传区，清空表单，展示表单
+    aiSection.classList.add('hidden')
+    resultArea.classList.remove('hidden')
+    formTitle.textContent = '✏️ 手动填写'
+    hintText.textContent = '填写完整信息后同步到 Notion'
+    clearForm()
+    errorMessage.classList.add('hidden')
+    syncStatus.classList.add('hidden')
+  } else {
+    // AI 模式：隐藏表单，展示上传区
+    aiSection.classList.remove('hidden')
+    resultArea.classList.add('hidden')
+    formTitle.textContent = '📋 编辑内容'
+    hintText.textContent = '拍照或选图后自动识别，确认后同步到 Notion'
+    clearForm()
+    errorMessage.classList.add('hidden')
+    syncStatus.classList.add('hidden')
+  }
+})
+
+// ===== 清空表单 =====
+function clearForm() {
+  fieldModule.value = ''
+  fieldType.innerHTML = '<option value="">请选择</option>'
+  fieldErrorReason.value = ''
+  fieldKnowledge.value = ''
+  fieldSource.value = ''
+  fieldQuestion.value = ''
+  fieldOptA.value = ''
+  fieldOptB.value = ''
+  fieldOptC.value = ''
+  fieldOptD.value = ''
+  fieldMyAnswer.value = ''
+  fieldCorrect.value = ''
+  fieldSolution.value = ''
+  syncStatus.classList.add('hidden')
+  syncStatus.onclick = null
+  syncStatus.style.cursor = 'default'
+  syncStatus.style.textDecoration = 'none'
+}
 
 // ===== 上传逻辑 =====
 uploadArea.addEventListener('click', () => fileInput.click())
@@ -108,7 +166,6 @@ function handleFile(file) {
 // ===== 提交识别 =====
 async function submitImage(base64) {
   loadingState.classList.remove('hidden')
-  hintArea.classList.add('hidden')
 
   try {
     const res = await fetch('/api/process', {
@@ -132,7 +189,6 @@ async function submitImage(base64) {
     resultArea.classList.remove('hidden')
   } finally {
     loadingState.classList.add('hidden')
-    hintArea.classList.remove('hidden')
   }
 }
 
@@ -141,20 +197,15 @@ function fillResult(data) {
   // 模块
   if (data.module && ENUMS.module.includes(data.module)) {
     fieldModule.value = data.module
-    // 触发 change 加载对应的题型下拉
     const event = new Event('change')
     fieldModule.dispatchEvent(event)
   }
 
   // 题型
-  if (data.questionType) {
-    fieldType.value = data.questionType
-  }
+  if (data.questionType) fieldType.value = data.questionType
 
   // 错误原因
-  if (data.errorReason) {
-    fieldErrorReason.value = data.errorReason
-  }
+  if (data.errorReason) fieldErrorReason.value = data.errorReason
 
   // 知识点
   if (data.knowledgePoints && data.knowledgePoints.length) {
@@ -163,6 +214,17 @@ function fillResult(data) {
 
   // 来源
   if (data.source) fieldSource.value = data.source
+
+  // 题目
+  if (data.question) fieldQuestion.value = data.question
+
+  // 选项
+  if (data.options) {
+    if (data.options.A) fieldOptA.value = data.options.A
+    if (data.options.B) fieldOptB.value = data.options.B
+    if (data.options.C) fieldOptC.value = data.options.C
+    if (data.options.D) fieldOptD.value = data.options.D
+  }
 
   // 答案
   if (data.myAnswer) fieldMyAnswer.value = data.myAnswer
@@ -182,11 +244,20 @@ syncBtn.addEventListener('click', async () => {
       ? fieldKnowledge.value.split(/[,，]/).map((s) => s.trim()).filter(Boolean)
       : [],
     source: fieldSource.value,
+    question: fieldQuestion.value,
+    options: {},
     myAnswer: fieldMyAnswer.value,
     correctAnswer: fieldCorrect.value,
     solution: fieldSolution.value,
-    imageUrl: currentImageBase64, // 后端会处理
+    imageUrl: currentImageBase64,
   }
+
+  // 选项
+  if (fieldOptA.value) payload.options.A = fieldOptA.value
+  if (fieldOptB.value) payload.options.B = fieldOptB.value
+  if (fieldOptC.value) payload.options.C = fieldOptC.value
+  if (fieldOptD.value) payload.options.D = fieldOptD.value
+  if (Object.keys(payload.options).length === 0) payload.options = null
 
   if (!payload.module) {
     showToast('请选择模块')
