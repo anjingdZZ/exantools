@@ -12,9 +12,7 @@
     tailwind.config = {
       theme: {
         extend: {
-          colors: {
-            primary: { 50: '#eef2ff', 100: '#e0e7ff', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca' },
-          }
+          colors: { primary: { 50: '#eef2ff', 100: '#e0e7ff', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca' }, }
         }
       }
     }
@@ -22,118 +20,75 @@
   <style>
     * { -webkit-tap-highlight-color: transparent; }
     body { padding-bottom: env(safe-area-inset-bottom); }
-    .upload-area {
-      border: 2px dashed #c7d2fe;
-      transition: all 0.2s;
-    }
-    .upload-area.dragover {
-      border-color: #6366f1;
-      background: #eef2ff;
-    }
-    .loading-spinner {
-      width: 28px; height: 28px;
-      border: 3px solid #e0e7ff;
-      border-top-color: #6366f1;
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-    }
+    .upload-area { border: 2px dashed #c7d2fe; transition: all 0.2s; }
+    .upload-area.dragover { border-color: #6366f1; background: #eef2ff; }
+    .loading-spinner { width: 28px; height: 28px; border: 3px solid #e0e7ff; border-top-color: #6366f1; border-radius: 50%; animation: spin 0.7s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .fade-in { animation: fadeIn 0.3s ease-out; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    /* 切换开关 */
-    .toggle-switch {
-      position: relative;
-      width: 48px;
-      height: 26px;
-      background: #cbd5e1;
-      border-radius: 13px;
-      transition: 0.2s;
-      cursor: pointer;
-      flex-shrink: 0;
-    }
-    .toggle-switch.active {
-      background: #6366f1;
-    }
-    .toggle-switch::after {
-      content: '';
-      position: absolute;
-      top: 3px;
-      left: 3px;
-      width: 20px;
-      height: 20px;
-      background: white;
-      border-radius: 50%;
-      transition: 0.2s;
-    }
-    .toggle-switch.active::after {
-      left: 25px;
-    }
+    .mode-btn { padding: 4px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; transition: 0.2s; }
+    .mode-btn.active { background: #6366f1; color: white; }
+    .mode-btn.inactive { background: #f1f5f9; color: #94a3b8; }
   </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
   <div class="max-w-lg mx-auto px-4 py-6">
-    <!-- 标题 + 切换 -->
-    <div class="flex items-center justify-between mb-6">
-      <div>
-        <h1 class="text-2xl font-bold text-gray-800">📝 考公错题整理</h1>
-      </div>
-      <div class="flex items-center gap-2 text-sm">
-        <span id="toggleLabel" class="text-gray-500">🤖 AI</span>
-        <div id="modeToggle" class="toggle-switch"></div>
+    <!-- 标题 + 模式切换 -->
+    <div class="flex items-center justify-between mb-4">
+      <h1 class="text-xl font-bold text-gray-800">📝 考公错题整理</h1>
+      <div class="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
+        <span id="aiModeBtn" class="mode-btn active">🤖 AI</span>
+        <span id="manualModeBtn" class="mode-btn inactive">✏️ 手动</span>
       </div>
     </div>
 
-    <!-- AI 模式：上传区域 -->
-    <div id="aiSection">
-      <div id="uploadArea"
-           class="upload-area rounded-xl p-8 text-center cursor-pointer bg-white mb-4">
-        <div id="uploadPlaceholder">
-          <div class="text-5xl mb-3">📸</div>
-          <p class="text-gray-600 font-medium">点击拍照 或 选择图片</p>
-          <p class="text-xs text-gray-400 mt-2">支持 JPG / PNG，最大 20MB</p>
-        </div>
-        <div id="uploadPreview" class="hidden">
-          <img id="previewImage" class="max-h-64 mx-auto rounded-lg shadow-sm" alt="预览">
-          <p id="changePhoto" class="text-sm text-primary-600 mt-2 underline">重新选择</p>
-        </div>
-        <input id="fileInput" type="file" accept="image/*" capture="environment" class="hidden">
+    <!-- AI 模式下的上传区域 -->
+    <div id="uploadArea"
+         class="upload-area rounded-xl p-6 text-center cursor-pointer bg-white mb-4">
+      <div id="uploadPlaceholder">
+        <div class="text-4xl mb-2">📸</div>
+        <p class="text-gray-600 font-medium">点击拍照 或 选择图片</p>
+        <p class="text-xs text-gray-400 mt-1">支持 JPG / PNG，最大 20MB</p>
       </div>
-
-      <!-- 识别中 -->
-      <div id="loadingState" class="hidden bg-white rounded-xl p-6 text-center mb-4">
-        <div class="loading-spinner mx-auto mb-3"></div>
-        <p class="text-gray-600">AI 识别中，请稍候...</p>
-        <p class="text-xs text-gray-400 mt-1">正在分析题目内容</p>
+      <div id="uploadPreview" class="hidden">
+        <img id="previewImage" class="max-h-48 mx-auto rounded-lg shadow-sm" alt="预览">
+        <p id="changePhoto" class="text-sm text-primary-600 mt-2 underline">重新选择</p>
       </div>
+      <input id="fileInput" type="file" accept="image/*" capture="environment" class="hidden">
     </div>
 
-    <!-- 结果/编辑区（AI模式和手动模式共用） -->
+    <!-- 识别中 -->
+    <div id="loadingState" class="hidden bg-white rounded-xl p-6 text-center mb-4">
+      <div class="loading-spinner mx-auto mb-3"></div>
+      <p class="text-gray-600">AI 识别中，请稍候...</p>
+    </div>
+
+    <!-- 编辑区 -->
     <div id="resultArea" class="hidden fade-in">
-      <!-- 错误提示 -->
       <div id="errorMessage" class="hidden bg-red-50 border border-red-200 rounded-xl p-4 mb-4 text-red-700 text-sm"></div>
 
       <div class="bg-white rounded-xl p-5 mb-4 shadow-sm">
         <h2 class="text-base font-semibold text-gray-700 mb-4">
-          <span id="formTitle">📋 编辑内容</span>
+          <span id="formTitle">编辑错题</span>
         </h2>
 
         <div class="space-y-3">
           <!-- 模块 -->
           <div>
             <label class="text-xs text-gray-500 font-medium">模块</label>
-            <select id="fieldModule" class="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"></select>
+            <select id="fieldModule" class="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"></select>
           </div>
 
           <!-- 题型 -->
           <div>
             <label class="text-xs text-gray-500 font-medium">题型</label>
-            <select id="fieldType" class="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"></select>
+            <select id="fieldType" class="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"></select>
           </div>
 
           <!-- 错误原因 -->
           <div>
             <label class="text-xs text-gray-500 font-medium">错误原因</label>
-            <select id="fieldErrorReason" class="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+            <select id="fieldErrorReason" class="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm">
               <option value="">请选择</option>
               <option>知识点盲区</option>
               <option>审题失误</option>
@@ -147,62 +102,41 @@
           <!-- 知识点 -->
           <div>
             <label class="text-xs text-gray-500 font-medium">知识点（逗号分隔）</label>
-            <input id="fieldKnowledge" type="text" class="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder="如: 对称轴旋转, 面数量">
+            <input id="fieldKnowledge" type="text" class="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm" placeholder="如: 对称轴旋转, 面数量">
           </div>
 
           <!-- 来源 -->
           <div>
             <label class="text-xs text-gray-500 font-medium">来源</label>
-            <input id="fieldSource" type="text" class="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder="如: 2024国考 / 粉笔模考">
+            <input id="fieldSource" type="text" class="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm" placeholder="如: 2024国考 / 粉笔模考">
           </div>
 
           <!-- 题目 -->
           <div>
             <label class="text-xs text-gray-500 font-medium">题目文本</label>
-            <textarea id="fieldQuestion" rows="3" class="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder="输入题目内容"></textarea>
-          </div>
-
-          <!-- 选项 -->
-          <div class="grid grid-cols-2 gap-2">
-            <div>
-              <label class="text-xs text-gray-500 font-medium">A</label>
-              <input id="fieldOptA" type="text" class="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm">
-            </div>
-            <div>
-              <label class="text-xs text-gray-500 font-medium">B</label>
-              <input id="fieldOptB" type="text" class="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm">
-            </div>
-            <div>
-              <label class="text-xs text-gray-500 font-medium">C</label>
-              <input id="fieldOptC" type="text" class="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm">
-            </div>
-            <div>
-              <label class="text-xs text-gray-500 font-medium">D</label>
-              <input id="fieldOptD" type="text" class="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm">
-            </div>
+            <textarea id="fieldQuestion" rows="3" class="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm" placeholder="输入题目内容"></textarea>
           </div>
 
           <!-- 答案 -->
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="text-xs text-gray-500 font-medium">我的答案</label>
-              <input id="fieldMyAnswer" type="text" class="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+              <input id="fieldMyAnswer" type="text" class="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm">
             </div>
             <div>
               <label class="text-xs text-gray-500 font-medium">正确答案</label>
-              <input id="fieldCorrect" type="text" class="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+              <input id="fieldCorrect" type="text" class="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm">
             </div>
           </div>
 
           <!-- 解题思路 -->
           <div>
             <label class="text-xs text-gray-500 font-medium">解题思路</label>
-            <textarea id="fieldSolution" rows="4" class="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"></textarea>
+            <textarea id="fieldSolution" rows="4" class="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"></textarea>
           </div>
         </div>
       </div>
 
-      <!-- 同步按钮 -->
       <button id="syncBtn"
               class="w-full py-3.5 bg-primary-600 text-white font-medium rounded-xl text-base
                      hover:bg-primary-700 active:bg-primary-800 transition-colors
@@ -212,9 +146,8 @@
       <p id="syncStatus" class="text-center text-sm mt-2 hidden"></p>
     </div>
 
-    <!-- 操作提示 -->
-    <div id="hintArea" class="text-center mt-6 text-xs text-gray-400">
-      <p id="hintText">拍照或选图后自动识别，确认后同步到 Notion</p>
+    <div id="hintArea" class="text-center mt-4 text-xs text-gray-400">
+      <p id="hintText">拍照上传 → AI 自动识别 → 确认修改 → 同步到 Notion</p>
     </div>
   </div>
 
