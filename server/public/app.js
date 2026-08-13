@@ -29,12 +29,14 @@ const hintText = document.getElementById('hintText')
 
 // 手动模式的图片上传
 const manualUploadSection = document.getElementById('manualUploadSection')
-const manualUploadArea = document.getElementById('manualUploadArea')
-const manualUploadPlaceholder = document.getElementById('manualUploadPlaceholder')
 const manualUploadPreview = document.getElementById('manualUploadPreview')
 const manualPreviewImage = document.getElementById('manualPreviewImage')
+const manualDeleteBtn = document.getElementById('manualDeleteBtn')
 const manualChangePhoto = document.getElementById('manualChangePhoto')
 const manualFileInput = document.getElementById('manualFileInput')
+const manualPasteBox = document.getElementById('manualPasteBox')
+const manualPasteText = document.getElementById('manualPasteText')
+const manualSelectBtn = document.getElementById('manualSelectBtn')
 
 const F = {
   module: document.getElementById('fieldModule'),
@@ -80,7 +82,7 @@ function setMode(manual) {
   currentImageBase64 = null
   uploadPlaceholder.classList.remove('hidden')
   uploadPreview.classList.add('hidden')
-  manualUploadPlaceholder.classList.remove('hidden')
+  manualPasteBox.classList.remove('hidden')
   manualUploadPreview.classList.add('hidden')
 
   if (manual) {
@@ -131,14 +133,20 @@ function handleAIFile(file) {
 }
 
 // ===== 手动模式图片上传 =====
-const manualSelectBtn = document.getElementById('manualSelectBtn')
-const manualPasteBtn = document.getElementById('manualPasteBtn')
 
-// 📁 点击选择文件：弹出文件选择器
+// 📁 右侧图标：点击弹出文件选择器
 manualSelectBtn.addEventListener('click', () => manualFileInput.click())
-// 📋 粘贴图片：聚焦到粘贴按钮，然后 Ctrl+V
-manualPasteBtn.addEventListener('click', () => manualPasteBtn.focus())
-manualPasteBtn.addEventListener('paste', handlePaste)
+// 点击输入框：聚焦，接收粘贴
+manualPasteBox.addEventListener('click', () => manualPasteBox.focus())
+manualPasteBox.addEventListener('paste', handlePaste)
+// ✕ 删除图片
+manualDeleteBtn.addEventListener('click', () => {
+  currentImageBase64 = null
+  manualFileInput.value = ''
+  manualUploadPreview.classList.add('hidden')
+  manualPasteBox.classList.remove('hidden')
+})
+// 重新选择
 manualChangePhoto.addEventListener('click', (e) => { e.stopPropagation(); manualFileInput.click() })
 manualFileInput.addEventListener('change', () => {
   if (manualFileInput.files[0]) handleManualFile(manualFileInput.files[0])
@@ -164,7 +172,7 @@ function handleManualFile(file) {
   reader.onload = (e) => {
     currentImageBase64 = e.target.result
     manualPreviewImage.src = currentImageBase64
-    manualUploadPlaceholder.classList.add('hidden')
+    manualPasteBox.classList.add('hidden')
     manualUploadPreview.classList.remove('hidden')
   }
   reader.readAsDataURL(file)
