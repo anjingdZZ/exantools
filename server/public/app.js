@@ -150,6 +150,21 @@ function handleManualFile(file) {
   reader.readAsDataURL(file)
 }
 
+// 手动模式：复制图片后粘贴上传
+document.addEventListener('paste', (e) => {
+  if (!isManual) return  // 只在手动模式生效
+  const items = e.clipboardData?.items
+  if (!items) return
+  for (const item of items) {
+    if (item.type && item.type.startsWith('image/')) {
+      e.preventDefault()
+      const file = item.getAsFile()
+      if (file) handleManualFile(file)
+      break
+    }
+  }
+})
+
 // ===== AI 识别 =====
 async function submitImage(base64) {
   loadingState.classList.remove('hidden')
