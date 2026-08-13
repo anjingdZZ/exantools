@@ -137,6 +137,23 @@ manualFileInput.addEventListener('change', () => {
   if (manualFileInput.files[0]) handleManualFile(manualFileInput.files[0])
 })
 
+// 在图片上传区域内支持粘贴（点击区域后，键盘焦点落在那里，Ctrl+V 即可粘贴）
+manualUploadArea.addEventListener('paste', handlePaste)
+manualFileInput.addEventListener('paste', handlePaste)
+
+function handlePaste(e) {
+  const items = e.clipboardData?.items
+  if (!items) return
+  for (const item of items) {
+    if (item.type && item.type.startsWith('image/')) {
+      e.preventDefault()
+      const file = item.getAsFile()
+      if (file) handleManualFile(file)
+      break
+    }
+  }
+}
+
 function handleManualFile(file) {
   if (!file.type.startsWith('image/')) { showToast('请选择图片文件'); return }
   if (file.size > 20 * 1024 * 1024) { showToast('图片超过 20MB 限制'); return }
@@ -150,20 +167,6 @@ function handleManualFile(file) {
   reader.readAsDataURL(file)
 }
 
-// 手动模式：复制图片后粘贴上传
-document.addEventListener('paste', (e) => {
-  if (!isManual) return  // 只在手动模式生效
-  const items = e.clipboardData?.items
-  if (!items) return
-  for (const item of items) {
-    if (item.type && item.type.startsWith('image/')) {
-      e.preventDefault()
-      const file = item.getAsFile()
-      if (file) handleManualFile(file)
-      break
-    }
-  }
-})
 
 // ===== AI 识别 =====
 async function submitImage(base64) {
