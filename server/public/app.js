@@ -131,15 +131,18 @@ function handleAIFile(file) {
 }
 
 // ===== 手动模式图片上传 =====
-manualUploadArea.addEventListener('click', () => manualFileInput.click())
+const manualSelectBtn = document.getElementById('manualSelectBtn')
+const manualPasteBtn = document.getElementById('manualPasteBtn')
+
+// 📁 点击选择文件：弹出文件选择器
+manualSelectBtn.addEventListener('click', () => manualFileInput.click())
+// 📋 粘贴图片：聚焦到粘贴按钮，然后 Ctrl+V
+manualPasteBtn.addEventListener('click', () => manualPasteBtn.focus())
+manualPasteBtn.addEventListener('paste', handlePaste)
 manualChangePhoto.addEventListener('click', (e) => { e.stopPropagation(); manualFileInput.click() })
 manualFileInput.addEventListener('change', () => {
   if (manualFileInput.files[0]) handleManualFile(manualFileInput.files[0])
 })
-
-// 在图片上传区域内支持粘贴（点击区域后，键盘焦点落在那里，Ctrl+V 即可粘贴）
-manualUploadArea.addEventListener('paste', handlePaste)
-manualFileInput.addEventListener('paste', handlePaste)
 
 function handlePaste(e) {
   const items = e.clipboardData?.items
